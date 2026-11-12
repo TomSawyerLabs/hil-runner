@@ -50,6 +50,8 @@ mmdebstrap --architectures=arm64 --variant=important \
 
 in_root() { chroot "$ROOT" "$@"; }
 mount -t proc proc "$ROOT/proc"
+# systemd-resolved made it a link into /run, which is empty here. Restored below.
+rm -f "$ROOT/etc/resolv.conf"
 cp /etc/resolv.conf "$ROOT/etc/resolv.conf"
 
 # cron is Priority: important. Only cron itself may go.
