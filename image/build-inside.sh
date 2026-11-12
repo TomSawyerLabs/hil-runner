@@ -101,7 +101,7 @@ ln -s /opt/cpp-coveralls/bin/coveralls "$ROOT/usr/local/bin/coveralls"
 
 # --- Our files -------------------------------------------------------------------------------
 cp -R /src/rootfs/. "$ROOT/"
-chmod 0755 "$ROOT"/usr/local/libexec/hil/* "$ROOT"/usr/local/bin/*
+chmod 0755 "$ROOT"/usr/local/libexec/hil/* "$ROOT/usr/local/bin/hil-avrdude"
 in_root systemctl enable systemd-networkd systemd-resolved systemd-time-wait-sync \
   hil-hat-safe hil-ssh-keygen hil-runner ssh >/dev/null
 echo "$NAME ($BUILD_REV)" > "$ROOT/etc/hil/release"
