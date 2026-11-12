@@ -133,6 +133,16 @@ install -m 0755 /src/initramfs/hil-root.hook "$ROOT/etc/initramfs-tools/hooks/hi
 sed -i 's/^BUSYBOX=.*/BUSYBOX=y/' "$ROOT/etc/initramfs-tools/initramfs.conf"
 mount -t proc proc "$ROOT/proc"
 in_root update-initramfs -u -k all >/dev/null
+# Everything hilram needs has to be in there; a Pi that can't fetch its root just panics.
+KVER=$(ls "$ROOT/lib/modules")
+in_root lsinitramfs "/boot/initrd.img-$KVER" > $W/initramfs.list
+for want in scripts/hilram etc/hil-root.sha256 'squashfs/squashfs.ko' 'overlayfs/overlay.ko' 'bin/busybox' 'bin/wget' 'bin/sha256sum'; do
+  grep -q -- "$want" $W/initramfs.list || { echo "the initramfs has no $want" >&2; exit 1; }
+done
+in_root sh -c "unmkinitramfs /boot/initrd.img-$KVER /tmp/ird && cat /tmp/ird/main/etc/hil-root.sha256 2>/dev/null || cat /tmp/ird/etc/hil-root.sha256" | grep -qx "$SQFS_SHA" || {
+  echo "the initramfs carries the wrong rootfs.sqfs hash" >&2; exit 1
+}
+rm -rf "$ROOT/tmp/ird"
 umount "$ROOT/proc"
 
 # --- The boot filesystem ---------------------------------------------------------------------
