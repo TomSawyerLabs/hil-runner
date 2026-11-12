@@ -1,0 +1,16 @@
+{
+  "name": "hil-runner-broker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hands one-job (JIT) GitHub Actions runner configs to known machines, by their address",
+  "type": "module",
+  "scripts": {
+    "start": "bun src/main.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.4",
+    "typescript": "7.0.2"
+  }
+}

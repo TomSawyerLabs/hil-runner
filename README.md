@@ -28,7 +28,7 @@ Every job gets a freshly booted machine:
 | `image/rootfs/` | Files laid over the root: services, HAT control, avrdude config, udev rules |
 | `image/boot/config.txt` | The Pi firmware config |
 | `image/overlays/hil-lockdown.dts` | The kernel holds GPIO 0/1 so jobs can't reach the HAT ID EEPROM |
-| `broker/` | The JIT config broker (to come) |
+| `broker/` | The JIT config broker: Bun/TypeScript, published as `ghcr.io/tomsawyerlabs/hil-runner-broker` |
 
 ## Building
 
@@ -54,6 +54,37 @@ The output is a bare FAT filesystem. BootBob reads boot files out of it directly
 
 On the Pi's boot interface, BootBob should offer only `tftp` and `http`, not `nbd`. The Pi
 doesn't use NBD, and an NBD export of a disk that isn't copy-on-write is writable.
+
+## The broker
+
+A small HTTP service that hands each configured machine a one-job runner config. Its one
+endpoint is `GET /v1/jitconfig`, plus `/healthz`. It knows a machine only by the address the
+request came from, so it must sit where machines reach it directly, with no proxy in between.
+It ignores `X-Forwarded-For` and similar headers on purpose.
+
+For each request, it:
+
+1. refuses any address that isn't in its config, with `403`;
+2. allows each machine one request per `minIntervalSeconds`, otherwise answering `429`;
+3. deletes any runner still registered under that machine's name, since a machine asking
+   again has rebooted. If that runner is busy, it answers `409` and touches nothing;
+4. calls `POST /orgs/{org}/actions/runners/generate-jitconfig` and returns the encoded config.
+
+### The GitHub App
+
+- **Permission:** one organization permission, *Self-hosted runners: Read and write*,
+  and nothing else.
+- **Where:** installed on the org whose runners it manages.
+- **Key:** the App's private key goes in the file `github.privateKeyFile` names.
+- **Org setting:** org runners in a group serve public repos only if that group allows
+  public repositories (org Settings, Actions, Runner groups).
+
+### Config and tests
+
+Config is one JSON file (`BROKER_CONFIG`, default `/config/broker.json`). See
+`broker/broker.example.json`.
+
+Run the tests with `cd broker && bun install && bun test && bun run typecheck`.
 
 ## On the machine
 
