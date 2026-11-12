@@ -1,0 +1,17 @@
+#!/bin/sh
+# Ask the broker for a one-job (JIT) runner config, then run that one job. The broker knows
+# this machine by its address, so nothing secret is ever in the image.
+#
+#   hil.broker=<url>   on the kernel command line, e.g. http://10.255.0.5:8090
+set -eu
+
+broker=$(sed -n 's/.*hil\.broker=\([^ ]*\).*/\1/p' /proc/cmdline)
+if [ -z "$broker" ]; then
+	echo "no hil.broker= on the kernel command line" >&2
+	sleep 60
+	exit 1
+fi
+
+echo "$(cat /etc/hil/release): asking $broker for a runner config"
+cfg=$(curl -fsS --max-time 30 --retry 20 --retry-all-errors --retry-delay 15 "$broker/v1/jitconfig")
+exec ./run.sh --jitconfig "$cfg"

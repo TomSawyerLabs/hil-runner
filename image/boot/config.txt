@@ -1,0 +1,18 @@
+# hil-runner: Raspberry Pi 4 with the AVR Test HAT (v1), booted from BootBob into RAM.
+arm_64bit=1
+kernel=kernel8.img
+initramfs initramfs8 followkernel
+
+# SPI0 for avrdude's linuxspi (the AVR's ISP).
+dtparam=spi=on
+# The PL011 UART on GPIO 14/15 for the AVR's serial port; Bluetooth gets nothing.
+enable_uart=1
+dtoverlay=disable-bt
+dtparam=audio=off
+
+# The kernel holds GPIO 0/1 (the HAT ID EEPROM's bus), so jobs can't drive them.
+dtoverlay=hil-lockdown
+
+# Sets the boot EEPROM's write-protect bits. They only hold while the EEPROM's hardware
+# WP pin is asserted, which is a wire on the board (see README.md).
+eeprom_write_protect=1

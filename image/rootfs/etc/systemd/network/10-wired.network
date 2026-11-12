@@ -1,0 +1,7 @@
+[Match]
+Name=e*
+
+[Network]
+DHCP=yes
+# The root filesystem is in RAM, but keep the address the initramfs set up anyway.
+KeepConfiguration=yes

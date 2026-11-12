@@ -1,0 +1,11 @@
+[Unit]
+Description=Put the AVR Test HAT in its safe state (AVR off) at boot
+Before=hil-runner.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/hil/hat off
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

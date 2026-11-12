@@ -1,0 +1,50 @@
+# initramfs-tools boot script, chosen by boot=hilram on the kernel command line.
+#
+# Downloads the root filesystem (a squashfs) over HTTP into RAM, checks it against the
+# hash built into this initramfs, and mounts it read-only under a tmpfs overlay. Nothing
+# is ever written anywhere but RAM, so a reboot always starts from the image as built.
+#
+#   hil.root=<url>   where to fetch rootfs.sqfs (BootBob: /boot/disk/<image>/rootfs.sqfs)
+
+# init calls these around mountroot; there are no hil-top/premount/bottom scripts.
+mount_top() { :; }
+mount_premount() { :; }
+mount_bottom() { :; }
+
+hil_param() {
+	for x in $(cat /proc/cmdline); do
+		case "$x" in "$1="*) echo "${x#*=}" ;; esac
+	done
+}
+
+mountroot() {
+	url=$(hil_param hil.root)
+	[ -n "$url" ] || panic "hilram: no hil.root= on the kernel command line"
+	expected=$(cat /etc/hil-root.sha256)
+
+	configure_networking
+	modprobe -q squashfs || panic "hilram: no squashfs module"
+	modprobe -q overlay || panic "hilram: no overlay module"
+
+	# Separate mounts from the initramfs itself, so they outlive the switch to the real root.
+	mkdir -p /hil/img /hil/lower /hil/rw
+	mount -t tmpfs -o mode=0700 hilimg /hil/img
+
+	tries=0
+	log_begin_msg "hilram: fetching $url"
+	until wget -q -O /hil/img/rootfs.sqfs "$url"; do
+		tries=$((tries + 1))
+		[ "$tries" -lt 10 ] || panic "hilram: couldn't fetch $url"
+		sleep 3
+	done
+	log_end_msg
+
+	actual=$(sha256sum /hil/img/rootfs.sqfs | cut -d' ' -f1)
+	[ "$actual" = "$expected" ] || panic "hilram: rootfs.sqfs is $actual, expected $expected"
+
+	mount -t squashfs -o ro,loop /hil/img/rootfs.sqfs /hil/lower || panic "hilram: can't mount rootfs.sqfs"
+	mount -t tmpfs -o mode=0755 hilrw /hil/rw
+	mkdir /hil/rw/upper /hil/rw/work
+	mount -t overlay -o lowerdir=/hil/lower,upperdir=/hil/rw/upper,workdir=/hil/rw/work \
+		hilroot "${rootmnt:?}" || panic "hilram: can't mount the overlay"
+}

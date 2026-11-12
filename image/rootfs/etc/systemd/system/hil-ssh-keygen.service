@@ -1,0 +1,11 @@
+[Unit]
+Description=Make this boot's SSH host keys (the image is public, so it carries none)
+Before=ssh.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ssh-keygen -A
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

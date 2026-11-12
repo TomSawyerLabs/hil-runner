@@ -1,0 +1,4 @@
+* text=auto
+# Everything under image/ ends up on a Linux machine, so it must be LF on every OS.
+image/** text eol=lf
+*.sh text eol=lf

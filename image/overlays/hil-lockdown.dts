@@ -1,0 +1,22 @@
+// Holds GPIO 0 and 1 (ID_SD/ID_SC, the HAT ID EEPROM's I2C bus) as kernel-owned inputs.
+// A line the kernel has hogged can't be requested from userspace (EBUSY), so a job with
+// access to /dev/gpiochip0 still can't bit-bang the HAT EEPROM. The firmware reads that
+// EEPROM before Linux starts, so this doesn't get in its way.
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2711";
+
+	fragment@0 {
+		target = <&gpio>;
+		__overlay__ {
+			hil_id_eeprom_hog {
+				gpio-hog;
+				gpios = <0 0>, <1 0>;
+				input;
+				line-name = "hil-locked";
+			};
+		};
+	};
+};

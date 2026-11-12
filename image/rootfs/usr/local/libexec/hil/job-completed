@@ -1,0 +1,5 @@
+#!/bin/sh
+# Runner hook (ACTIONS_RUNNER_HOOK_JOB_COMPLETED): leave the AVR off. The machine reboots
+# after this anyway; this covers the time until it does.
+set -eu
+/usr/local/libexec/hil/hat off

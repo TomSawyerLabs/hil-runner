@@ -1,0 +1,8 @@
+# What the runner user (groups hilgpio, spi, plugdev) may touch, and nothing more.
+# GPIO: the BCM2711's pins, for the HAT and avrdude's reset line. GPIO 0/1 are held by the
+# kernel (overlay hil-lockdown); the boot EEPROM relies on its hardware write-protect.
+SUBSYSTEM=="gpio", KERNEL=="gpiochip0", GROUP="hilgpio", MODE="0660"
+# SPI0 CE0: avrdude's linuxspi.
+SUBSYSTEM=="spidev", KERNEL=="spidev0.0", GROUP="spi", MODE="0660"
+# The AVR's DFU bootloader (Atmel).
+SUBSYSTEM=="usb", ATTR{idVendor}=="03eb", GROUP="plugdev", MODE="0660"

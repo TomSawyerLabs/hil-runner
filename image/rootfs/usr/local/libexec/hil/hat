@@ -1,0 +1,47 @@
+#!/bin/sh
+# Drive the AVR Test HAT (v1) from the Pi's GPIO.
+#
+#   hat off     AVR unpowered, held in reset, ISP and serial buffers off
+#   hat on      AVR powered, ISP and serial on, reset into the DFU bootloader
+#   hat reset   pulse reset (bootloader still selected by HWB)
+#
+# The pin map is the 2023 setup's (TomSawyerLabs/mcu-hil, branch v1-archive,
+# sd-card-2023/opt/action-scripts/shared.sh), confirmed against the schematic.
+set -eu
+
+CHIP=gpiochip0
+RESET=13        # 0 holds the AVR in reset
+RESET_PULL=19
+HWB=2           # 0 at reset selects the bootloader
+HWB_PULL=3
+VCC=27          # 1 powers the AVR
+UVCC=18         # 1 powers its USB
+SPI_DISABLE=5   # 0 enables the ISP buffer
+SERIAL_DISABLE=8
+ACTIVITY=26     # LED
+
+# Set lines and release them; the BCM2711 keeps a released output as it was.
+set_lines() { gpioset -c "$CHIP" -t 0 "$@"; }
+
+case "${1:-}" in
+off)
+	set_lines $RESET=0 $SPI_DISABLE=1 $SERIAL_DISABLE=1 $HWB=1 $HWB_PULL=1 $ACTIVITY=0
+	set_lines $VCC=0 $UVCC=0
+	;;
+on)
+	set_lines $ACTIVITY=1 $RESET=0 $RESET_PULL=1 $HWB=0 $HWB_PULL=0
+	set_lines $VCC=1 $UVCC=1
+	set_lines $SPI_DISABLE=0 $SERIAL_DISABLE=0
+	sleep 0.1
+	set_lines $RESET=1
+	;;
+reset)
+	set_lines $RESET=0
+	sleep 0.1
+	set_lines $RESET=1
+	;;
+*)
+	echo "usage: hat off|on|reset" >&2
+	exit 2
+	;;
+esac

@@ -1,0 +1,10 @@
+#!/bin/sh
+# initramfs-tools hook: what the hilram boot script needs.
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case "${1:-}" in prereqs) prereqs; exit 0 ;; esac
+
+. /usr/share/initramfs-tools/hook-functions
+manual_add_modules squashfs overlay loop
+mkdir -p "${DESTDIR:?}/etc"
+cp /etc/hil-root.sha256 "${DESTDIR}/etc/hil-root.sha256"

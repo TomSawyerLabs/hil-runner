@@ -1,0 +1,22 @@
+#!/bin/sh
+# Runner hook (ACTIONS_RUNNER_HOOK_JOB_STARTED): give the job a freshly power-cycled AVR,
+# sitting in its DFU bootloader.
+set -eu
+HAT=/usr/local/libexec/hil/hat
+
+echo "$(cat /etc/hil/release): power-cycling the AVR"
+$HAT off
+sleep 1
+$HAT on
+
+# Atmel's USB vendor ID: the DFU bootloader enumerating.
+i=0
+until grep -qx 03eb /sys/bus/usb/devices/*/idVendor 2>/dev/null; do
+	i=$((i + 1))
+	if [ "$i" -ge 50 ]; then
+		echo "::warning::the AVR's DFU bootloader didn't enumerate on USB within 5 s"
+		exit 0
+	fi
+	sleep 0.1
+done
+lsusb -d 03eb:

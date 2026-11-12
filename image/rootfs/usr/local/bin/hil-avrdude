@@ -1,0 +1,4 @@
+#!/bin/sh
+# avrdude through the AVR Test HAT: linuxspi on /dev/spidev0.0, AVR reset on GPIO 13.
+# Tests find it as $AVRDUDE; $TARGET is the part.
+exec avrdude -C +/etc/hil/avrdude-hil.conf -c avr-test-hat -p "${TARGET:-atmega8u2}" -B 500kHz "$@"
