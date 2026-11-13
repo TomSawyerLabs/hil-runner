@@ -3,6 +3,8 @@
 export interface Client {
   /** The machine's IPv4 address, as the broker sees it (no proxies in between). */
   address: string;
+  /** The organization the machine serves. The App must be installed there. */
+  org: string;
   /** The runner's name on GitHub. One live registration per name. */
   name: string;
   /** Labels, including the defaults GitHub would give (self-hosted, linux, ARM64). */
@@ -13,7 +15,7 @@ export interface Client {
 
 export interface Config {
   listen: { host: string; port: number };
-  github: { appId: number; privateKeyFile: string; org: string; apiUrl: string };
+  github: { appId: number; privateKeyFile: string; apiUrl: string };
   /** Seconds a client must wait between requests. */
   minIntervalSeconds: number;
   clients: Client[];
@@ -40,7 +42,7 @@ export function parseConfig(raw: unknown): Config {
   const gh = r.github ?? fail("github is required");
   if (!Number.isInteger(gh.appId) || gh.appId < 1) fail("github.appId must be the App's numeric ID");
   if (typeof gh.privateKeyFile !== "string" || !gh.privateKeyFile) fail("github.privateKeyFile is required");
-  if (typeof gh.org !== "string" || !NAME.test(gh.org)) fail("github.org must be an organization login");
+  if (gh.org !== undefined) fail("github.org has moved: give each client its own org");
   const apiUrl = gh.apiUrl ?? "https://api.github.com";
   if (typeof apiUrl !== "string" || !/^https?:\/\//.test(apiUrl)) fail("github.apiUrl must be a URL");
 
@@ -53,6 +55,7 @@ export function parseConfig(raw: unknown): Config {
   const clients: Client[] = r.clients.map((c: any, i: number) => {
     const at = `clients[${i}]`;
     if (typeof c?.address !== "string" || !IPV4.test(c.address)) fail(`${at}.address must be an IPv4 address`);
+    if (typeof c.org !== "string" || !NAME.test(c.org)) fail(`${at}.org must be an organization login`);
     if (typeof c.name !== "string" || !NAME.test(c.name)) fail(`${at}.name must be a runner name`);
     if (!Array.isArray(c.labels) || c.labels.length === 0 || !c.labels.every((l: unknown) => typeof l === "string" && NAME.test(l)))
       fail(`${at}.labels must be a non-empty list of labels`);
@@ -62,12 +65,12 @@ export function parseConfig(raw: unknown): Config {
     if (seenName.has(c.name)) fail(`${at}.name ${c.name} is listed twice`);
     seenAddr.add(c.address);
     seenName.add(c.name);
-    return { address: c.address, name: c.name, labels: [...c.labels], runnerGroupId };
+    return { address: c.address, org: c.org, name: c.name, labels: [...c.labels], runnerGroupId };
   });
 
   return {
     listen: { host, port },
-    github: { appId: gh.appId, privateKeyFile: gh.privateKeyFile, org: gh.org, apiUrl: apiUrl.replace(/\/+$/, "") },
+    github: { appId: gh.appId, privateKeyFile: gh.privateKeyFile, apiUrl: apiUrl.replace(/\/+$/, "") },
     minIntervalSeconds,
     clients,
   };

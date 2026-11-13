@@ -2,13 +2,13 @@
   "listen": { "host": "0.0.0.0", "port": 8090 },
   "github": {
     "appId": 123456,
-    "privateKeyFile": "/secrets/github-app.pem",
-    "org": "dfu-programmer"
+    "privateKeyFile": "/secrets/github-app.pem"
   },
   "minIntervalSeconds": 20,
   "clients": [
     {
       "address": "10.0.0.20",
+      "org": "dfu-programmer",
       "name": "avr-test-hat",
       "labels": ["self-hosted", "linux", "ARM64", "avr-test-hat"],
       "runnerGroupId": 1

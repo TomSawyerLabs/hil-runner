@@ -7,7 +7,7 @@ import { GitHub, loadKey } from "./github";
 const file = process.env.BROKER_CONFIG ?? "/config/broker.json";
 const config = parseConfig(JSON.parse(readFileSync(file, "utf8")));
 const key = loadKey(readFileSync(config.github.privateKeyFile, "utf8"));
-const github = new GitHub({ apiUrl: config.github.apiUrl, appId: config.github.appId, org: config.github.org, key });
+const github = new GitHub({ apiUrl: config.github.apiUrl, appId: config.github.appId, key });
 const broker = new Broker(config, github);
 
 const server = Bun.serve({
@@ -17,6 +17,6 @@ const server = Bun.serve({
 });
 
 console.log(
-  `hil-runner broker on ${server.hostname}:${server.port} for org ${config.github.org}: ` +
-    config.clients.map((c) => `${c.name}@${c.address}`).join(", "),
+  `hil-runner broker on ${server.hostname}:${server.port}: ` +
+    config.clients.map((c) => `${c.org}/${c.name}@${c.address}`).join(", "),
 );

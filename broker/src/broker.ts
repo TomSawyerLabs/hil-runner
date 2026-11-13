@@ -48,15 +48,15 @@ export class Broker {
     try {
       // One live registration per machine. A machine asking again has rebooted, so any
       // runner still under its name is a leftover: remove it before making the new one.
-      for (const old of await this.github.runnersNamed(client.name)) {
+      for (const old of await this.github.runnersNamed(client.org, client.name)) {
         if (old.busy) {
           this.log(`${client.name} (${addr}): runner ${old.id} is still busy on GitHub; not replacing it`);
           return text(409, "a runner with this machine's name is still running a job\n");
         }
-        await this.github.deleteRunner(old.id);
+        await this.github.deleteRunner(client.org, old.id);
         this.log(`${client.name} (${addr}): removed leftover runner ${old.id} (${old.status})`);
       }
-      const { runnerId, config } = await this.github.jitConfig(client.name, client.labels, client.runnerGroupId);
+      const { runnerId, config } = await this.github.jitConfig(client.org, client.name, client.labels, client.runnerGroupId);
       this.log(`${client.name} (${addr}): issued a JIT config for runner ${runnerId}`);
       return text(200, config);
     } catch (e) {

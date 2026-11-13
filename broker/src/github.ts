@@ -1,5 +1,6 @@
 // GitHub App authentication and the three runner calls the broker makes.
 // The App needs one permission: Organization > Self-hosted runners: Read and write.
+// One App serves every org it's installed on; each org gets its own installation token.
 
 import { createPrivateKey, createSign, type KeyObject } from "node:crypto";
 
@@ -38,10 +39,10 @@ export interface Runner {
 }
 
 export class GitHub {
-  private token: { value: string; expires: number } | null = null;
+  private readonly tokens = new Map<string, { value: string; expires: number }>();
 
   constructor(
-    private readonly opts: { apiUrl: string; appId: number; org: string; key: KeyObject },
+    private readonly opts: { apiUrl: string; appId: number; key: KeyObject },
     private readonly fetch: Fetch = globalThis.fetch,
     private readonly now: () => number = Date.now,
   ) {}
@@ -66,27 +67,28 @@ export class GitHub {
   }
 
   /** An installation token for the org, reused until five minutes before it expires. */
-  private async auth(): Promise<string> {
-    if (this.token && this.token.expires - 5 * 60_000 > this.now()) return `Bearer ${this.token.value}`;
+  private async auth(org: string): Promise<string> {
+    const cached = this.tokens.get(org);
+    if (cached && cached.expires - 5 * 60_000 > this.now()) return `Bearer ${cached.value}`;
     const jwt = `Bearer ${appJwt(this.opts.appId, this.opts.key, Math.floor(this.now() / 1000))}`;
-    const inst = await this.call("GET", `/orgs/${this.opts.org}/installation`, jwt);
+    const inst = await this.call("GET", `/orgs/${org}/installation`, jwt);
     const tok = await this.call("POST", `/app/installations/${inst.id}/access_tokens`, jwt, {});
-    this.token = { value: tok.token, expires: Date.parse(tok.expires_at) };
+    this.tokens.set(org, { value: tok.token, expires: Date.parse(tok.expires_at) });
     return `Bearer ${tok.token}`;
   }
 
-  async runnersNamed(name: string): Promise<Runner[]> {
-    const auth = await this.auth();
-    const r = await this.call("GET", `/orgs/${this.opts.org}/actions/runners?name=${encodeURIComponent(name)}&per_page=100`, auth);
+  async runnersNamed(org: string, name: string): Promise<Runner[]> {
+    const auth = await this.auth(org);
+    const r = await this.call("GET", `/orgs/${org}/actions/runners?name=${encodeURIComponent(name)}&per_page=100`, auth);
     return (r.runners as Runner[]).filter((x) => x.name === name);
   }
 
-  async deleteRunner(id: number): Promise<void> {
-    await this.call("DELETE", `/orgs/${this.opts.org}/actions/runners/${id}`, await this.auth());
+  async deleteRunner(org: string, id: number): Promise<void> {
+    await this.call("DELETE", `/orgs/${org}/actions/runners/${id}`, await this.auth(org));
   }
 
-  async jitConfig(name: string, labels: string[], runnerGroupId: number): Promise<{ runnerId: number; config: string }> {
-    const r = await this.call("POST", `/orgs/${this.opts.org}/actions/runners/generate-jitconfig`, await this.auth(), {
+  async jitConfig(org: string, name: string, labels: string[], runnerGroupId: number): Promise<{ runnerId: number; config: string }> {
+    const r = await this.call("POST", `/orgs/${org}/actions/runners/generate-jitconfig`, await this.auth(org), {
       name,
       runner_group_id: runnerGroupId,
       labels,

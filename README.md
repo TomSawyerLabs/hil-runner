@@ -72,12 +72,22 @@ For each request, it:
 
 ### The GitHub App
 
+One App serves every project. It's owned by TomSawyerLabs and installed on each org that
+has a machine.
+
 - **Permission:** one organization permission, *Self-hosted runners: Read and write*,
   and nothing else.
-- **Where:** installed on the org whose runners it manages.
+- **Who can install it:** any account, since it has to reach orgs TomSawyerLabs doesn't
+  own. That's safe: installing it somewhere gives that org nothing. The broker only
+  registers runners for the orgs its config names.
+- **Machines:** each entry in `clients` names its `org`. A machine serves one org, and the
+  broker gets a separate installation token for each org.
 - **Key:** the App's private key goes in the file `github.privateKeyFile` names.
 - **Org setting:** org runners in a group serve public repos only if that group allows
   public repositories (org Settings, Actions, Runner groups).
+- **Repos under a user account** can't use org runners. They'd need repo-level runners,
+  and the App would need *Administration: Read and write* on those repos. The broker
+  doesn't do that; move such a project into an org instead.
 
 ### Config and tests
 

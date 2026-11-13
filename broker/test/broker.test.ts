@@ -5,8 +5,11 @@ import { normalizeAddress, parseConfig } from "../src/config";
 import { GitHub, GitHubError, appJwt, type Runner } from "../src/github";
 
 const base = {
-  github: { appId: 42, privateKeyFile: "/secrets/app.pem", org: "dfu-programmer" },
-  clients: [{ address: "10.9.0.20", name: "avr-test-hat", labels: ["self-hosted", "linux", "ARM64", "avr-test-hat"] }],
+  github: { appId: 42, privateKeyFile: "/secrets/app.pem" },
+  clients: [
+    { address: "10.9.0.20", org: "dfu-programmer", name: "avr-test-hat", labels: ["self-hosted", "linux", "ARM64", "avr-test-hat"] },
+    { address: "10.9.0.30", org: "TomSawyerLabs", name: "other-rig", labels: ["self-hosted", "other-rig"] },
+  ],
 };
 
 describe("config", () => {
@@ -23,6 +26,8 @@ describe("config", () => {
     expect(() => parseConfig({ ...base, clients: [{ ...base.clients[0], address: "10.9.0.256" }] })).toThrow("address");
     expect(() => parseConfig({ ...base, clients: [{ ...base.clients[0], labels: [] }] })).toThrow("labels");
     expect(() => parseConfig({ ...base, clients: [base.clients[0], { ...base.clients[0], name: "other" }] })).toThrow("twice");
+    expect(() => parseConfig({ ...base, clients: [{ ...base.clients[0], org: undefined }] })).toThrow("org");
+    expect(() => parseConfig({ ...base, github: { ...base.github, org: "dfu-programmer" } })).toThrow("each client its own org");
     expect(() => parseConfig({ ...base, github: { ...base.github, appId: "42" } })).toThrow("appId");
   });
 
@@ -47,29 +52,35 @@ describe("GitHub App JWT", () => {
 });
 
 describe("GitHub client", () => {
-  test("gets an installation token once and reuses it", async () => {
+  test("gets an installation token once per org and reuses it", async () => {
     const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
     const calls: string[] = [];
     const fake = async (url: string, init?: RequestInit) => {
       const path = url.replace("https://api.github.com", "");
       calls.push(`${init?.method} ${path} ${(init?.headers as Record<string, string>).Authorization?.slice(0, 12)}`);
       if (path === "/orgs/o/installation") return Response.json({ id: 7 });
-      if (path === "/app/installations/7/access_tokens")
-        return Response.json({ token: "ghs_x", expires_at: new Date(Date.now() + 3600_000).toISOString() }, { status: 201 });
-      if (path.startsWith("/orgs/o/actions/runners?name=")) return Response.json({ runners: [] });
+      if (path === "/orgs/p/installation") return Response.json({ id: 8 });
+      const tok = /^\/app\/installations\/(\d)\/access_tokens$/.exec(path);
+      if (tok) return Response.json({ token: `ghs_${tok[1]}`, expires_at: new Date(Date.now() + 3600_000).toISOString() }, { status: 201 });
+      if (/^\/orgs\/[op]\/actions\/runners\?name=/.test(path)) return Response.json({ runners: [] });
       return new Response("?", { status: 500 });
     };
-    const gh = new GitHub({ apiUrl: "https://api.github.com", appId: 1, org: "o", key: privateKey }, fake);
-    await gh.runnersNamed("a");
-    await gh.runnersNamed("b");
+    const gh = new GitHub({ apiUrl: "https://api.github.com", appId: 1, key: privateKey }, fake);
+    await gh.runnersNamed("o", "a");
+    await gh.runnersNamed("o", "b");
     expect(calls.filter((c) => c.includes("access_tokens"))).toHaveLength(1);
-    expect(calls.at(-1)).toBe("GET /orgs/o/actions/runners?name=b&per_page=100 Bearer ghs_x");
+    expect(calls.at(-1)).toBe("GET /orgs/o/actions/runners?name=b&per_page=100 Bearer ghs_7");
+    await gh.runnersNamed("p", "c");
+    await gh.runnersNamed("o", "d");
+    expect(calls.filter((c) => c.includes("access_tokens"))).toHaveLength(2);
+    expect(calls.at(-2)).toBe("GET /orgs/p/actions/runners?name=c&per_page=100 Bearer ghs_8");
+    expect(calls.at(-1)).toBe("GET /orgs/o/actions/runners?name=d&per_page=100 Bearer ghs_7");
   });
 
   test("raises GitHub's status on failure", async () => {
     const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-    const gh = new GitHub({ apiUrl: "https://api.github.com", appId: 1, org: "o", key: privateKey }, async () => new Response("nope", { status: 403 }));
-    await expect(gh.runnersNamed("a")).rejects.toBeInstanceOf(GitHubError);
+    const gh = new GitHub({ apiUrl: "https://api.github.com", appId: 1, key: privateKey }, async () => new Response("nope", { status: 403 }));
+    await expect(gh.runnersNamed("o", "a")).rejects.toBeInstanceOf(GitHubError);
   });
 });
 
@@ -78,14 +89,14 @@ function setup(runners: Runner[] = [], opts: { fail?: boolean } = {}) {
   const logs: string[] = [];
   let t = 1_000_000;
   const gh = {
-    runnersNamed: async (name: string) => {
-      calls.push(`list ${name}`);
+    runnersNamed: async (org: string, name: string) => {
+      calls.push(`list ${org}/${name}`);
       if (opts.fail) throw new GitHubError(401, "bad credentials");
       return runners;
     },
-    deleteRunner: async (id: number) => void calls.push(`delete ${id}`),
-    jitConfig: async (name: string, labels: string[], group: number) => {
-      calls.push(`jit ${name} ${labels.join(",")} ${group}`);
+    deleteRunner: async (org: string, id: number) => void calls.push(`delete ${org}/${id}`),
+    jitConfig: async (org: string, name: string, labels: string[], group: number) => {
+      calls.push(`jit ${org}/${name} ${labels.join(",")} ${group}`);
       return { runnerId: 99, config: "ENCODED" };
     },
   };
@@ -101,7 +112,13 @@ describe("broker", () => {
     const res = await ask("10.9.0.20");
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("ENCODED");
-    expect(calls).toEqual(["list avr-test-hat", "jit avr-test-hat self-hosted,linux,ARM64,avr-test-hat 1"]);
+    expect(calls).toEqual(["list dfu-programmer/avr-test-hat", "jit dfu-programmer/avr-test-hat self-hosted,linux,ARM64,avr-test-hat 1"]);
+  });
+
+  test("registers each machine in its own org", async () => {
+    const { ask, calls } = setup();
+    expect((await ask("10.9.0.30")).status).toBe(200);
+    expect(calls).toEqual(["list TomSawyerLabs/other-rig", "jit TomSawyerLabs/other-rig self-hosted,other-rig 1"]);
   });
 
   test("knows machines only by source address, never by headers", async () => {
@@ -118,13 +135,17 @@ describe("broker", () => {
   test("removes a leftover registration before making a new one", async () => {
     const { ask, calls } = setup([{ id: 5, name: "avr-test-hat", status: "offline", busy: false }]);
     expect((await ask("10.9.0.20")).status).toBe(200);
-    expect(calls).toEqual(["list avr-test-hat", "delete 5", "jit avr-test-hat self-hosted,linux,ARM64,avr-test-hat 1"]);
+    expect(calls).toEqual([
+      "list dfu-programmer/avr-test-hat",
+      "delete dfu-programmer/5",
+      "jit dfu-programmer/avr-test-hat self-hosted,linux,ARM64,avr-test-hat 1",
+    ]);
   });
 
   test("won't replace a runner that's still busy", async () => {
     const { ask, calls } = setup([{ id: 5, name: "avr-test-hat", status: "online", busy: true }]);
     expect((await ask("10.9.0.20")).status).toBe(409);
-    expect(calls).toEqual(["list avr-test-hat"]);
+    expect(calls).toEqual(["list dfu-programmer/avr-test-hat"]);
   });
 
   test("rate-limits each machine", async () => {
