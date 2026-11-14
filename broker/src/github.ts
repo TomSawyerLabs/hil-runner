@@ -22,6 +22,12 @@ export function loadKey(pem: string): KeyObject {
   return createPrivateKey(pem);
 }
 
+/** The key as an env value: the PEM itself, or (since env files hold one line) its base64. */
+export function keyFromEnv(value: string): KeyObject {
+  const v = value.trim();
+  return loadKey(v.startsWith("-----BEGIN") ? v : Buffer.from(v, "base64").toString("utf8"));
+}
+
 export class GitHubError extends Error {
   constructor(
     readonly status: number,

@@ -15,7 +15,8 @@ export interface Client {
 
 export interface Config {
   listen: { host: string; port: number };
-  github: { appId: number; privateKeyFile: string; apiUrl: string };
+  /** The App key's file. Optional: GITHUB_APP_PRIVATE_KEY in the environment wins over it. */
+  github: { appId: number; privateKeyFile?: string; apiUrl: string };
   /** Seconds a client must wait between requests. */
   minIntervalSeconds: number;
   clients: Client[];
@@ -41,7 +42,8 @@ export function parseConfig(raw: unknown): Config {
 
   const gh = r.github ?? fail("github is required");
   if (!Number.isInteger(gh.appId) || gh.appId < 1) fail("github.appId must be the App's numeric ID");
-  if (typeof gh.privateKeyFile !== "string" || !gh.privateKeyFile) fail("github.privateKeyFile is required");
+  if (gh.privateKeyFile !== undefined && (typeof gh.privateKeyFile !== "string" || !gh.privateKeyFile))
+    fail("github.privateKeyFile must be a path");
   if (gh.org !== undefined) fail("github.org has moved: give each client its own org");
   const apiUrl = gh.apiUrl ?? "https://api.github.com";
   if (typeof apiUrl !== "string" || !/^https?:\/\//.test(apiUrl)) fail("github.apiUrl must be a URL");

@@ -82,7 +82,10 @@ has a machine.
   registers runners for the orgs its config names.
 - **Machines:** each entry in `clients` names its `org`. A machine serves one org, and the
   broker gets a separate installation token for each org.
-- **Key:** the App's private key goes in the file `github.privateKeyFile` names.
+- **Key:** the App's private key, in the environment variable `GITHUB_APP_PRIVATE_KEY`
+  as its base64 (env files hold one line) or the PEM itself. A key file named by
+  `github.privateKeyFile` works too. The environment wins, and the broker clears the
+  variable once it has read it.
 - **Org setting:** org runners in a group serve public repos only if that group allows
   public repositories (org Settings, Actions, Runner groups).
 - **Repos under a user account** can't use org runners. They'd need repo-level runners,

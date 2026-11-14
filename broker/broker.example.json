@@ -1,8 +1,7 @@
 {
   "listen": { "host": "0.0.0.0", "port": 8090 },
   "github": {
-    "appId": 123456,
-    "privateKeyFile": "/secrets/github-app.pem"
+    "appId": 5753989
   },
   "minIntervalSeconds": 20,
   "clients": [

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { generateKeyPairSync, createVerify } from "node:crypto";
 import { Broker } from "../src/broker";
 import { normalizeAddress, parseConfig } from "../src/config";
-import { GitHub, GitHubError, appJwt, type Runner } from "../src/github";
+import { GitHub, GitHubError, appJwt, keyFromEnv, type Runner } from "../src/github";
 
 const base = {
   github: { appId: 42, privateKeyFile: "/secrets/app.pem" },
@@ -48,6 +48,16 @@ describe("GitHub App JWT", () => {
     const v = createVerify("RSA-SHA256");
     v.update(`${h}.${p}`);
     expect(v.verify(publicKey, Buffer.from(s!, "base64url"))).toBe(true);
+  });
+});
+
+describe("App key from the environment", () => {
+  test("takes the PEM or its base64", () => {
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const pem = privateKey.export({ type: "pkcs1", format: "pem" }) as string;
+    const want = privateKey.export({ type: "pkcs8", format: "der" });
+    expect(keyFromEnv(pem).export({ type: "pkcs8", format: "der" })).toEqual(want);
+    expect(keyFromEnv(Buffer.from(pem).toString("base64") + "\n").export({ type: "pkcs8", format: "der" })).toEqual(want);
   });
 });
 
